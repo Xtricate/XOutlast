@@ -1,13 +1,11 @@
 ### Outlast in pygcurse
-import pygame, math, sys
+import pygame, math, sys, random
 from pygame.locals import *
 import pygcurse
+import MapGen as gen
 
-MAPWIDTH=20
-MAPHEIGHT=20
-
-playerx = MAPWIDTH // 2
-playery = MAPHEIGHT // 2
+MAPWIDTH=gen.MAPWIDTH
+MAPHEIGHT=gen.MAPHEIGHT
 
 PlayerTurn = True
 
@@ -26,22 +24,6 @@ class Object: #A visible character on the window
             self.x += dx
             self.y += dy
 
-class Tile:
-    def __init__(self, blocked, block_sight=None):
-        self.blocked=blocked
-        if block_sight is None: block_sight = blocked
-        self.block_sight = block_sight
-
-def make_map():
-    global mp
-
-    mp = [[Tile(False)
-    for y in range(MAPHEIGHT)]
-    for x in range(MAPWIDTH)]
-#def make_room(topleftx, toplefty, bottomleftx, bottomlefty):
-
-
-
 def handle_keys():
     global playerx, playery
 
@@ -58,6 +40,11 @@ def handle_keys():
         elif event.type == QUIT:
             quit()
 
+def rand_player_pos():
+     mx = len(gen.empty_tiles)
+     start_pos = gen.empty_tiles[random.randint(0,mx)]
+     player.x = start_pos[0]  
+     player.y = start_pos[1]  
 
 def render_all():
     global mp
@@ -65,7 +52,7 @@ def render_all():
         for x in range(MAPWIDTH):
             wall = mp[x][y].block_sight
             if wall:
-                win.putchars('#', x, y, fgcolor=(255,0,0,255)) #RED
+                win.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
             else: 
                 win.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
     
@@ -76,12 +63,14 @@ def render_all():
 
 
 def mainloop():
-    make_map()
+    global mp
+    mp = gen.make_map()
+    rand_player_pos()
     render_all()
     while 1:
         handle_keys()
 
-player = Object(playerx, playery, '@', pygame.Color(255,255,255))
+player = Object(0, 0, '@', pygame.Color(255,255,255))
 objects = [player]
 
 mainloop()
