@@ -31,8 +31,7 @@ class Rectangle:
         return (center_x, center_y)
 
     def intersect(self, other):
-        return (self.x1 <= other.x2 and self.x2 >= other.x1 and
-                self.y1 <= other.y2 and self.y2 >= other.y1)
+        return (self.x1 - 1) <= other.x2 and (self.x2 + 1) >= other.x1 and (self.y1 - 1) <= other.y2 and (self.y2 + 1) >= other.y1
 
 def hor_hall(x1, x2, y):
     global mp
@@ -59,12 +58,15 @@ def make_map():
     mp = [[Tile(True)
     for y in range(MAPHEIGHT)]
     for x in range(MAPWIDTH)]
-
     for r in range(MAX_ROOMS):
         w = random.randint(MIN_H_W, MAX_H_W)
         h = random.randint(MIN_H_W, MAX_H_W)
-        x = random.randint(1, MAPWIDTH - w - 1)
-        y = random.randint(1, MAPHEIGHT - h - 1)
+        x = random.randint(1, MAPWIDTH - w - 2)
+        y = random.randint(1, MAPHEIGHT - h - 2)
+        
+        if x >= (MAPWIDTH - w - 4) or y >= (MAPHEIGHT - h - 4):
+
+            print ((w, h, x, y))
         new_room = Rectangle(x, y, w, h)
         failedrooms = 0
         failed = False
