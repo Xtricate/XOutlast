@@ -3,6 +3,7 @@ import pygame, math, sys, random
 from pygame.locals import *
 import pygcurse
 import MapGen as gen
+import FovAlgo as fov
 
 MAPWIDTH=gen.MAPWIDTH
 MAPHEIGHT=gen.MAPHEIGHT
@@ -11,6 +12,15 @@ PlayerTurn = True
 
 win = pygcurse.PygcurseWindow(80, 50, 'Xtricate Presents: Outlast')
 win.autoupdate = False
+
+dirtytiles = []
+
+class Game:
+    def __init__(self):
+        global mp
+        mp = gen.make_map()
+        rand_player_pos()
+        mainloop()
 
 class Object: #A visible character on the window
     def __init__(self, x, y, char, color):
@@ -23,6 +33,10 @@ class Object: #A visible character on the window
         if not mp[self.x + dx][self.y + dy].blocked:
             self.x += dx
             self.y += dy
+            
+# class Fighter:
+    
+# class Enemy:
 
 def handle_keys():
     global playerx, playery
@@ -35,7 +49,6 @@ def handle_keys():
             if event.key == pygame.K_DOWN: player.move(0, 1)
             if event.key == pygame.K_LEFT: player.move(-1, 0)
             if event.key == pygame.K_RIGHT: player.move(1, 0)
-
             render_all()
         elif event.type == QUIT:
             quit()
@@ -46,31 +59,36 @@ def rand_player_pos():
      player.x = start_pos[0]  
      player.y = start_pos[1]  
 
+
 def render_all():
-    global mp
+    global mp, dirtytiles
+    fov_mp = fov.compute(mp, player.x, player.y, MAPHEIGHT, MAPWIDTH)
+    print len(fov_mp)
     for y in range(MAPHEIGHT):
         for x in range(MAPWIDTH):
-            wall = mp[x][y].block_sight
-            if wall:
-                win.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
-            else: 
-                win.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
-    
+            if fov_mp[x][y] == 1:
+                wall = mp[x][y].block_sight
+                if wall:
+                    win.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
+                else: 
+                    win.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
     for Object in objects:
         win.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.color)
-        win.update()
-        win.setscreencolors(None, None, clear=True)
+    win.update()
+    win.setscreencolors(None, None, False)
+    win.putchars('.', player.x, player.y, fgcolor=(255,255,255,255))
+
+
 
 
 def mainloop():
-    global mp
-    mp = gen.make_map()
-    rand_player_pos()
     render_all()
     while 1:
         handle_keys()
 
+game = Game()
+
 player = Object(0, 0, '@', pygame.Color(255,255,255))
 objects = [player]
 
-mainloop()
+start_game()
