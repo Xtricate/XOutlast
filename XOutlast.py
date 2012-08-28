@@ -3,88 +3,61 @@ import pygame, math, sys, random
 from pygame.locals import *
 import pygcurse
 import MapGen as gen
-import FovAlgo as fov
 
 MAPWIDTH=gen.MAPWIDTH
 MAPHEIGHT=gen.MAPHEIGHT
 
-PlayerTurn = True
+debug_mode = False
 
-win = pygcurse.PygcurseWindow(80, 50, 'Xtricate Presents: Outlast')
-win.autoupdate = False
+game_state = 'normal'
 
 dirtytiles = []
 
-class Object: #A visible character on the window
-    def __init__(self, x, y, char, color):
-        self.x = x
-        self.y = y
-        self.char = char
-        self.color = color
- 
-    def move(self, dx, dy):
-        if not mp[self.x + dx][self.y + dy].blocked:
-            self.x += dx
-            self.y += dy
+class Game:
+    def __init__(self, flags=None):
+        global mp
+        mp = gen.init()
+        gen.render_all()
+        mainloop()
+            
+# class Fighter:
+    
+# class Enemy:
 
 def handle_keys():
-    global playerx, playery
+    global playerx, playery, game_state
 
     turnkeys = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT)
 
     for event in pygame.event.get():
-        if event.type == pygame.KEYUP and event.key in turnkeys:
-            if event.key == pygame.K_UP: player.move(0, -1) 
-            if event.key == pygame.K_DOWN: player.move(0, 1)
-            if event.key == pygame.K_LEFT: player.move(-1, 0)
-            if event.key == pygame.K_RIGHT: player.move(1, 0)
-            render_all()
-        elif event.type == QUIT:
+        if event.type == QUIT or (event.type == pygame.KEYUP and event.key == pygame.K_ESCAPE):
             quit()
-
-def rand_player_pos():
-     mx = len(gen.empty_tiles)
-     start_pos = gen.empty_tiles[random.randint(0,mx)]
-     player.x = start_pos[0]  
-     player.y = start_pos[1]  
-
-def init_render():
-    global mp
-
-    win.update()
-
-def render_all():
-    global mp, dirtytiles
-    fov_mp = fov.compute(mp, player.x, player.y, MAPHEIGHT, MAPWIDTH)
-    print len(fov_mp)
-    for y in range(MAPHEIGHT):
-        for x in range(MAPWIDTH):
-            if fov_mp[x][y] == 1:
-                wall = mp[x][y].block_sight
-                if wall:
-                    win.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
-                else: 
-                    win.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
-    for Object in objects:
-        win.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.color)
-    win.update()
-    win.setscreencolors(None, None, False)
-    win.putchars('.', player.x, player.y, fgcolor=(255,255,255,255))
+        elif event.type == pygame.KEYUP and event.key == pygame.K_BACKSLASH:
+            if gen.win.fullscreen == True:
+                gen.win.fullscreen = False
+            else:
+                gen.win.fullscreen = True
+            gen.render_all()
+        if game_state == 'normal':        
+            if event.type == pygame.KEYUP and event.key in turnkeys:
+                if event.key == pygame.K_UP: gen.player.check(0, -1) 
+                if event.key == pygame.K_DOWN: gen.player.check(0, 1)
+                if event.key == pygame.K_LEFT: gen.player.check(-1, 0)
+                if event.key == pygame.K_RIGHT: gen.player.check(1, 0)
+                gen.render_all()
+        else:
+            return 'didnt-take-turn'
 
 
-def start_game():
-    global mp
-    mp = gen.make_map()
-    rand_player_pos()
- #   init_render()
-    mainloop()
 
 def mainloop():
-    render_all()
     while 1:
         handle_keys()
+        victory_check()
 
-player = Object(0, 0, '@', pygame.Color(255,255,255))
-objects = [player]
+def victory_check():
+    if len(gen.all_enemies) == 0:
+        print('Win!')
 
-start_game()
+game = Game()
+

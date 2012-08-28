@@ -1,5 +1,8 @@
-### Random map generator
-import random
+### Random map generator/handler
+import random, pygame, math, sys
+from pygame.locals import *
+import pygcurse
+import FovAlgo as fov
 
 MAPWIDTH=80
 MAPHEIGHT=45
@@ -7,16 +10,51 @@ MAPHEIGHT=45
 MAX_H_W = 10
 MIN_H_W = 6
 MAX_ROOMS = 30
+MAX_ENEMY = 4
+
+all_enemies = []
 
 rooms = []
 empty_tiles = []
 current_rooms = 0
+
+win = pygcurse.PygcurseWindow(80, 50, 'Xtricate Presents: Outlast')
+win.autoupdate = False
+
+class Object: #A visible character on the window
+    def __init__(self, x, y, char, name, color, blocks=False):
+        self.name = name
+        self.blocks = blocks
+        self.x = x
+        self.y = y
+        self.char = char
+        self.color = color
+
+    def move(self, dx, dy):
+        if not is_blocked(self.x + dx, self.y + dy):
+            self.x += dx
+            self.y += dy
+
+    def check(self, dx, dy):
+        target = None
+        tmpx = self.x + dx
+        tmpy = self.y + dy
+        for Object in objects:
+            if Object.x == tmpx and Object.y == tmpy:
+                target = Object
+                break
+        if target is not None:
+            print (target.name + ' hit')
+        else:
+            player.move(dx, dy)
+
 
 class Tile:
     def __init__(self, blocked, block_sight=None):
         self.blocked=blocked
         if block_sight is None: block_sight = blocked
         self.block_sight = block_sight
+        self.explored = False
 
 class Rectangle:
     def __init__(self, x, y, w, h):
@@ -32,6 +70,14 @@ class Rectangle:
 
     def intersect(self, other):
         return (self.x1 - 1) <= other.x2 and (self.x2 + 1) >= other.x1 and (self.y1 - 1) <= other.y2 and (self.y2 + 1) >= other.y1
+
+def is_blocked(x,y):
+    if mp[x][y].blocked:
+        return True
+    for Object in objects:
+        if Object.blocks and Object.x == x and Object.y == y:
+            return True
+    return False 
 
 def hor_hall(x1, x2, y):
     global mp
@@ -63,10 +109,7 @@ def make_map():
         h = random.randint(MIN_H_W, MAX_H_W)
         x = random.randint(1, MAPWIDTH - w - 2)
         y = random.randint(1, MAPHEIGHT - h - 2)
-        
-        if x >= (MAPWIDTH - w - 4) or y >= (MAPHEIGHT - h - 4):
 
-            print ((w, h, x, y))
         new_room = Rectangle(x, y, w, h)
         failedrooms = 0
         failed = False
@@ -78,6 +121,7 @@ def make_map():
 
         if not failed:
             make_room(new_room)
+            place_objects(new_room)
 
             (new_x, new_y) = new_room.center()
 
@@ -92,10 +136,83 @@ def make_map():
 
             rooms.append(new_room)
             current_rooms += 1
-    print len(rooms)
-    print failedrooms
     return mp
 
+def place_objects(room):
+    global all_enemies
+    enemies = random.randint(0, MAX_ENEMY)
+    items_placed = 0 #reset each time the function is called(each room)
+    for n in range(enemies):
+        acceptable_tile = False
+        while acceptable_tile != True:
+            x = random.randint(room.x1, room.x2)
+            y = random.randint(room.y1, room.y2)
+            if mp[x][y].blocked != True:
+                acceptable_tile = True
+        enemy_list = {'zombie':5, 'brute':4}
+        enemy = roll(enemy_list)
+        if enemy == 'zombie':
+            new_enemy = Object(x, y, 'z', 'zombie', pygame.Color(15,170,15), blocks=True)
+            objects.append(new_enemy)
+            all_enemies.append(new_enemy)
+        elif enemy == 'brute':
+            new_enemy = Object(x, y, 'b', 'brute', pygame.Color(70,15,15), blocks=True)
+            objects.append(new_enemy)
+            all_enemies.append(new_enemy)
 
+def roll(opts): #### roll() requires a dict with a key identifier, and the value assoc. as the number of chances the key recieves
+    cur_key = 0
+    total_chances = sum(opts.values())
+    choice = random.randint(1, total_chances)
+    for value in opts.values():
+        if choice <= value:
+            return (opts.keys())[cur_key]
+        elif choice > value:
+            choice -= value
+            cur_key += 1
+        else:
+            print('Error in funct \'roll\'. Shutting down.')
+            quit()
 
+def rand_player_pos():
+     mx = len(empty_tiles)
+     start_pos = empty_tiles[random.randint(0,mx)]
+     player.x = start_pos[0]  
+     player.y = start_pos[1]  
+
+def render_all():
+    global mp, dirtytiles
+    fov_mp = fov.compute(mp, player.x, player.y, MAPHEIGHT, MAPWIDTH)
+    for y in range(MAPHEIGHT):
+        for x in range(MAPWIDTH):
+            if fov_mp[x][y] == 1:
+                mp[x][y].explored = True
+                wall = mp[x][y].block_sight
+                if wall:
+                    win.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
+                else: 
+                    win.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
+            elif mp[x][y].explored:   
+                wall = mp[x][y].block_sight
+                if wall:
+                    win.putchars('#', x, y, fgcolor=(70,70,70,255))
+                else: 
+                    win.putchars('.', x, y, fgcolor=(70,70,70,255))
+    for Object in objects:
+        if fov_mp[Object.x][Object.y] == 1:
+            win.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.
+                color)
+
+    win.putchars('@', player.x, player.y, fgcolor=(255,255,255,255))
+
+    win.update()
+    win.setscreencolors(pygame.Color(215,215,215), None, False)
+
+def init():
+    global mp, player, objects
+    player = Object(0, 0, '@', 'player', pygame.Color(255,255,255))
+    objects = [player]
+    mp = make_map()
+    rand_player_pos()
+    return mp
 

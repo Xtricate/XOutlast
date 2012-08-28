@@ -181,17 +181,18 @@ def compute(level, playerx, playery, mpheight, mpwidth):
 
 
 # Let's draw it in console to show how pretty is that FOV!
-def test():
-    global mp, fov_mp, px, py
-    for x in range(W + 1):
-        for y in range(H + 1):
-            if (x, y) == (px, py):
-                sys.stdout.write("@") # Player
-            elif fov_mp[x][y] == 1:
-                if fov_mp[x][y] == 0: # Seen
-                    sys.stdout.write(".")
-                else:
-                    sys.stdout.write("#")
-            else:
-                sys.stdout.write("?") # Unseen
-        print
+
+# def test():
+#     global mp, fov_mp, px, py
+#     for x in range(W + 1):
+#         for y in range(H + 1):
+#             if (x, y) == (px, py):
+#                 sys.stdout.write("@") # Player
+#             elif fov_mp[x][y] == 1:
+#                 if fov_mp[x][y] == 0: # Seen
+#                     sys.stdout.write(".")
+#                 else:
+#                     sys.stdout.write("#")
+#             else:
+#                 sys.stdout.write("?") # Unseen
+#         print
