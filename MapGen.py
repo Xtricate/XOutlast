@@ -3,6 +3,8 @@ import random, pygame, math, sys
 from pygame.locals import *
 import pygcurse
 import FovAlgo as fov
+import AITracker as ait
+from AITracker import *
 
 MAPWIDTH=80
 MAPHEIGHT=45
@@ -22,18 +24,30 @@ win = pygcurse.PygcurseWindow(80, 50, 'Xtricate Presents: Outlast')
 win.autoupdate = False
 
 class Object: #A visible character on the window
-    def __init__(self, x, y, char, name, color, blocks=False):
+    def __init__(self, x, y, char, name, color, blocks=False, cognitive=False):
         self.name = name
         self.blocks = blocks
         self.x = x
         self.y = y
         self.char = char
         self.color = color
+        self.cognitive = cognitive
+        if self.cognitive:
+            self.cognitive.owner = self
 
     def move(self, dx, dy):
         if not is_blocked(self.x + dx, self.y + dy):
             self.x += dx
             self.y += dy
+
+    def move_towards(self, target_x, target_y):
+        dx = target_x - self.x
+        dy = target_y - self.y
+        distance = math.sqrt(dx ** 2 + dy ** 2)
+
+        dx = int(round(dx / distance))
+        dy = int(round(dy / distance))
+        self.move(dx, dy)
 
     def check(self, dx, dy):
         target = None
@@ -44,10 +58,20 @@ class Object: #A visible character on the window
                 target = Object
                 break
         if target is not None:
-            print (target.name + ' hit')
+            self.cognitive.mel_attack(target)
         else:
-            player.move(dx, dy)
+            self.move(dx, dy)
 
+    def distance_to(self, other):
+        dx = other.x - self.x
+        dy = other.y - self.y
+        return math.sqrt(dx ** 2 + dy ** 2)
+
+    def send_to_back(self):
+        #make this object be drawn first, so all others appear above it if they're in the same tile.
+        global objects
+        objects.remove(self)
+        objects.insert(0, self)
 
 class Tile:
     def __init__(self, blocked, block_sight=None):
@@ -71,6 +95,8 @@ class Rectangle:
     def intersect(self, other):
         return (self.x1 - 1) <= other.x2 and (self.x2 + 1) >= other.x1 and (self.y1 - 1) <= other.y2 and (self.y2 + 1) >= other.y1
 
+
+
 def is_blocked(x,y):
     if mp[x][y].blocked:
         return True
@@ -78,6 +104,17 @@ def is_blocked(x,y):
         if Object.blocks and Object.x == x and Object.y == y:
             return True
     return False 
+
+def ai_go():
+    global fov_mp
+    global objects
+    global player
+    ait.fov_mp = fov_mp
+    ait.objects = objects
+    ait.player = player
+    for Object in objects:
+        if Object.cognitive.ai != None and Object.cognitive.status == 'alive':
+            Object.cognitive.ai.take_turn()
 
 def hor_hall(x1, x2, y):
     global mp
@@ -149,14 +186,16 @@ def place_objects(room):
             y = random.randint(room.y1, room.y2)
             if mp[x][y].blocked != True:
                 acceptable_tile = True
-        enemy_list = {'zombie':5, 'brute':4}
+        enemy_list = {'zombie':5, 'brute':2}
         enemy = roll(enemy_list)
         if enemy == 'zombie':
-            new_enemy = Object(x, y, 'z', 'zombie', pygame.Color(15,170,15), blocks=True)
+            z_cog = ait.Cognitive(2, 2, 1, 3, 1, ai=ait.Enemy())
+            new_enemy = Object(x, y, 'z', 'zombie', pygame.Color(15,170,15), blocks=True, cognitive=z_cog)
             objects.append(new_enemy)
             all_enemies.append(new_enemy)
         elif enemy == 'brute':
-            new_enemy = Object(x, y, 'b', 'brute', pygame.Color(70,15,15), blocks=True)
+            b_cog = ait.Cognitive(4, 1, 3, 3, 1, ai=ait.Enemy())
+            new_enemy = Object(x, y, 'b', 'brute', pygame.Color(70,15,15), blocks=True, cognitive=b_cog)
             objects.append(new_enemy)
             all_enemies.append(new_enemy)
 
@@ -181,8 +220,9 @@ def rand_player_pos():
      player.y = start_pos[1]  
 
 def render_all():
-    global mp, dirtytiles
+    global mp, dirtytiles, fov_mp
     fov_mp = fov.compute(mp, player.x, player.y, MAPHEIGHT, MAPWIDTH)
+    ait.fov_mp = fov_mp
     for y in range(MAPHEIGHT):
         for x in range(MAPWIDTH):
             if fov_mp[x][y] == 1:
@@ -203,16 +243,37 @@ def render_all():
             win.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.
                 color)
 
-    win.putchars('@', player.x, player.y, fgcolor=(255,255,255,255))
+    win.putchars('Health:', 0, MAPHEIGHT + 1, fgcolor=(255,0,0,255))
+    if player.cognitive.hp > (7 * player.cognitive.con):
+        healthcolor = (0,255,0,255)
+    elif player.cognitive.hp > (4 * player.cognitive.con):
+        healthcolor = (255,255,0,255)
+    else:
+        healthcolor = (255,0,0,255)
+    win.putchars(str(player.cognitive.hp), 8, MAPHEIGHT + 1, fgcolor = healthcolor)
+
+
+    win.putchars(player.char, player.x, player.y, player.color)
 
     win.update()
+    win.putchars('    ', 8, MAPHEIGHT + 1, fgcolor = (0,0,0,255))
     win.setscreencolors(pygame.Color(215,215,215), None, False)
 
 def init():
-    global mp, player, objects
-    player = Object(0, 0, '@', 'player', pygame.Color(255,255,255))
+    global mp, player, objects, player_cognitive
+    player = Object(0, 0, '@', 'player', pygame.Color(255,255,255), cognitive = player_cognitive)
     objects = [player]
     mp = make_map()
     rand_player_pos()
     return mp
 
+####  TEMP VARS #####
+
+con = 5
+agi = 5
+pwr = 4
+stg = 4
+itl = 5
+player_cognitive = Cognitive(con, agi, pwr, stg, itl)
+
+#### /TEMP VARS #####

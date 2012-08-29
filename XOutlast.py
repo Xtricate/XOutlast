@@ -3,13 +3,13 @@ import pygame, math, sys, random
 from pygame.locals import *
 import pygcurse
 import MapGen as gen
+import AITracker as ait
 
 MAPWIDTH=gen.MAPWIDTH
 MAPHEIGHT=gen.MAPHEIGHT
 
 debug_mode = False
 
-game_state = 'normal'
 
 dirtytiles = []
 
@@ -20,9 +20,6 @@ class Game:
         gen.render_all()
         mainloop()
             
-# class Fighter:
-    
-# class Enemy:
 
 def handle_keys():
     global playerx, playery, game_state
@@ -38,17 +35,18 @@ def handle_keys():
             else:
                 gen.win.fullscreen = True
             gen.render_all()
-        if game_state == 'normal':        
+        if ait.game_state == 'normal':        
             if event.type == pygame.KEYUP and event.key in turnkeys:
                 if event.key == pygame.K_UP: gen.player.check(0, -1) 
                 if event.key == pygame.K_DOWN: gen.player.check(0, 1)
                 if event.key == pygame.K_LEFT: gen.player.check(-1, 0)
                 if event.key == pygame.K_RIGHT: gen.player.check(1, 0)
+                gen.ai_go()
                 gen.render_all()
+        elif ait.game_state == 'dead':
+            gen.render_all()
         else:
             return 'didnt-take-turn'
-
-
 
 def mainloop():
     while 1:
