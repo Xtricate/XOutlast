@@ -5,9 +5,8 @@ import pygcurse
 import FovAlgo as fov
 import AITracker as ait
 from AITracker import *
+import GuiHandler as gui
 
-MAPWIDTH=80
-MAPHEIGHT=45
 
 MAX_H_W = 10
 MIN_H_W = 6
@@ -15,13 +14,14 @@ MAX_ROOMS = 30
 MAX_ENEMY = 4
 
 all_enemies = []
-
 rooms = []
 empty_tiles = []
 current_rooms = 0
 
-win = pygcurse.PygcurseWindow(80, 50, 'Xtricate Presents: Outlast')
-win.autoupdate = False
+rlscreen = pygcurse.PygcurseWindow(gui.WIN_WIDTH, gui.WIN_HEIGHT, 'Xtricate Presents: Outlast')
+rlscreen.autoupdate = False
+rlscreen.autoblit = False
+
 
 class Object: #A visible character on the window
     def __init__(self, x, y, char, name, color, blocks=False, cognitive=False):
@@ -95,8 +95,6 @@ class Rectangle:
     def intersect(self, other):
         return (self.x1 - 1) <= other.x2 and (self.x2 + 1) >= other.x1 and (self.y1 - 1) <= other.y2 and (self.y2 + 1) >= other.y1
 
-
-
 def is_blocked(x,y):
     if mp[x][y].blocked:
         return True
@@ -139,13 +137,13 @@ def make_room(room):
 def make_map():
     global mp, current_rooms, rooms
     mp = [[Tile(True)
-    for y in range(MAPHEIGHT)]
-    for x in range(MAPWIDTH)]
+    for y in range(gui.MAPHEIGHT)]
+    for x in range(gui.MAPWIDTH)]
     for r in range(MAX_ROOMS):
         w = random.randint(MIN_H_W, MAX_H_W)
         h = random.randint(MIN_H_W, MAX_H_W)
-        x = random.randint(1, MAPWIDTH - w - 2)
-        y = random.randint(1, MAPHEIGHT - h - 2)
+        x = random.randint(1, gui.MAPWIDTH - w - 2)
+        y = random.randint(1, gui.MAPHEIGHT - h - 2)
 
         new_room = Rectangle(x, y, w, h)
         failedrooms = 0
@@ -189,12 +187,12 @@ def place_objects(room):
         enemy_list = {'zombie':5, 'brute':2}
         enemy = roll(enemy_list)
         if enemy == 'zombie':
-            z_cog = ait.Cognitive(2, 2, 1, 3, 1, ai=ait.Enemy())
+            z_cog = ait.Cognitive(2, 2, 1, 2, 1, ai=ait.Enemy())
             new_enemy = Object(x, y, 'z', 'zombie', pygame.Color(15,170,15), blocks=True, cognitive=z_cog)
             objects.append(new_enemy)
             all_enemies.append(new_enemy)
         elif enemy == 'brute':
-            b_cog = ait.Cognitive(4, 1, 3, 3, 1, ai=ait.Enemy())
+            b_cog = ait.Cognitive(4, 1, 2, 3, 1, ai=ait.Enemy())
             new_enemy = Object(x, y, 'b', 'brute', pygame.Color(70,15,15), blocks=True, cognitive=b_cog)
             objects.append(new_enemy)
             all_enemies.append(new_enemy)
@@ -220,47 +218,50 @@ def rand_player_pos():
      player.y = start_pos[1]  
 
 def render_all():
-    global mp, dirtytiles, fov_mp
-    fov_mp = fov.compute(mp, player.x, player.y, MAPHEIGHT, MAPWIDTH)
+    global mp, dirtytiles, fov_mp, MSGX, HBAR_WID
+    fov_mp = fov.compute(mp, player.x, player.y, gui.MAPHEIGHT, gui.MAPWIDTH)
     ait.fov_mp = fov_mp
-    for y in range(MAPHEIGHT):
-        for x in range(MAPWIDTH):
+    for y in range(gui.MAPHEIGHT):
+        for x in range(gui.MAPWIDTH):
             if fov_mp[x][y] == 1:
                 mp[x][y].explored = True
                 wall = mp[x][y].block_sight
                 if wall:
-                    win.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
+                    rlscreen.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
                 else: 
-                    win.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
+                    rlscreen.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
             elif mp[x][y].explored:   
                 wall = mp[x][y].block_sight
                 if wall:
-                    win.putchars('#', x, y, fgcolor=(70,70,70,255))
+                    rlscreen.putchars('#', x, y, fgcolor=(70,70,70,255))
                 else: 
-                    win.putchars('.', x, y, fgcolor=(70,70,70,255))
+                    rlscreen.putchars('.', x, y, fgcolor=(70,70,70,255))
     for Object in objects:
         if fov_mp[Object.x][Object.y] == 1:
-            win.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.
+            rlscreen.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.
                 color)
-
-    win.putchars('Health:', 0, MAPHEIGHT + 1, fgcolor=(255,0,0,255))
+    
     if player.cognitive.hp > (7 * player.cognitive.con):
         healthcolor = (0,255,0,255)
     elif player.cognitive.hp > (4 * player.cognitive.con):
         healthcolor = (255,255,0,255)
     else:
         healthcolor = (255,0,0,255)
-    win.putchars(str(player.cognitive.hp), 8, MAPHEIGHT + 1, fgcolor = healthcolor)
-
-
-    win.putchars(player.char, player.x, player.y, player.color)
-
-    win.update()
-    win.putchars('    ', 8, MAPHEIGHT + 1, fgcolor = (0,0,0,255))
-    win.setscreencolors(pygame.Color(215,215,215), None, False)
+    healthbar = pygcurse.PygcurseTextbox(gui.rlgui, region = (0, gui.MAPHEIGHT, gui.HBARWID, 1), bgcolor=None, fgcolor=healthcolor, border=None, text="Health: " + str(player.cognitive.hp), wrap=False)
+    gui.msg_display()
+    healthbar.update()
+    gui.rlgui.update()
+    gui.rlgui.blittowindow()
+    rlscreen.putchars(player.char, player.x, player.y, player.color)
+    rlscreen.update()
+    rlscreen.blittowindow()
+    gui.rlgui.putchars('     ', 8, gui.MAPHEIGHT, fgcolor = (0,0,0,255))
+    rlscreen.setscreencolors(pygame.Color(215,215,215), None, False)
+    gui.rlgui.fill(region=(gui.MSGX, gui.MAPHEIGHT, gui.MSG_MAX_WID, gui.MSG_HEIGHT))
 
 def init():
     global mp, player, objects, player_cognitive
+
     player = Object(0, 0, '@', 'player', pygame.Color(255,255,255), cognitive = player_cognitive)
     objects = [player]
     mp = make_map()

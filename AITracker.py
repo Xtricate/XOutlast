@@ -1,5 +1,6 @@
 # AI/Fighter Handler
 import math, random, pygame
+import GuiHandler as gui
 
 game_state = 'normal'
 
@@ -22,12 +23,12 @@ class Cognitive:
 
         dice = random.randint(0, 100)
         if dice == 100:
-            print ('The ' + self.owner.name.capitalize() + ' misses ' + target.name + '.')
+            gui.message('The ' + self.owner.name.capitalize() + ' misses ' + target.name + '.', pygame.Color(255,255,0))
         elif dice <= target.cognitive.agi:
-            print ('The ' + target.name.capitalize() + ' dodges the ' + self.owner.name.capitalize() + '\'s attack!')
+            gui.message('The ' + target.name.capitalize() + ' dodges the ' + self.owner.name.capitalize() + '\'s attack!', pygame.Color(0,0,255))
         
         else:
-            print ('The ' + self.owner.name.capitalize() + ' hits the ' + target.name + ' for ' + str(damage) + ' damage.')
+            gui.message('The ' + self.owner.name.capitalize() + ' hits the ' + target.name + ' for ' + str(damage) + ' damage.', pygame.Color(255,0,0))
             target.cognitive.take_damage(damage)
 
     def take_damage(self, damage):
@@ -37,13 +38,17 @@ class Cognitive:
 
     def die(self):
         global game_state
-        self.owner.send_to_back()
-        self.owner.char = '%'
-        self.owner.color = pygame.Color(100,0,0)
-        self.owner.blocks = False
-        if self.owner.name == 'player':
-            game_state = 'dead'
-            print 'You have died.'
+        if self.status == 'alive':
+            self.owner.send_to_back()
+            self.owner.char = '%'
+            self.owner.color = pygame.Color(100,0,0)
+            self.owner.blocks = False
+            self.status = 'dead'
+            if self.owner.name == 'player':
+                game_state = 'dead'
+                gui.message('You have died.', pygame.Color(150,0,0))
+            else:
+                self.ai = None
 
 
 class Enemy:

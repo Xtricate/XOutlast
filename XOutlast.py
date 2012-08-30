@@ -4,12 +4,13 @@ from pygame.locals import *
 import pygcurse
 import MapGen as gen
 import AITracker as ait
+import GuiHandler as gui
 
-MAPWIDTH=gen.MAPWIDTH
-MAPHEIGHT=gen.MAPHEIGHT
+
+MAPWIDTH=gui.MAPWIDTH
+MAPHEIGHT=gui.MAPHEIGHT
 
 debug_mode = False
-
 
 dirtytiles = []
 
@@ -17,6 +18,7 @@ class Game:
     def __init__(self, flags=None):
         global mp
         mp = gen.init()
+        gui.message('You hear zombies all around you.', pygame.Color(0,0,255))
         gen.render_all()
         mainloop()
             
@@ -41,6 +43,7 @@ def handle_keys():
                 if event.key == pygame.K_DOWN: gen.player.check(0, 1)
                 if event.key == pygame.K_LEFT: gen.player.check(-1, 0)
                 if event.key == pygame.K_RIGHT: gen.player.check(1, 0)
+                gui.msgs_updated = False
                 gen.ai_go()
                 gen.render_all()
         elif ait.game_state == 'dead':
