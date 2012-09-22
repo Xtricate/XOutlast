@@ -2,7 +2,7 @@
 import math, random, pygame
 import GuiHandler as gui
 
-game_state = 'normal'
+game_state = ''
 
 class Cognitive:
     def __init__(self, con, agi, pwr, stg, itl, ai=None):
@@ -42,7 +42,10 @@ class Cognitive:
             self.owner.send_to_back()
             self.owner.char = '%'
             self.owner.color = pygame.Color(100,0,0)
+            print self.owner.name
+            print 'blocks before?' + str(self.owner.blocks)
             self.owner.blocks = False
+            print 'blocks?' +  str(self.owner.blocks)
             self.status = 'dead'
             if self.owner.name == 'player':
                 game_state = 'dead'

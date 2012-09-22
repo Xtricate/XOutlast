@@ -173,8 +173,8 @@ def compute(level, playerx, playery, mpheight, mpwidth):
     mp = level
     px = playerx
     py = playery
-    W = mpwidth
-    H = mpheight
+    W = mpwidth - 1
+    H = mpheight - 1
 
     main()
     return fov_mp

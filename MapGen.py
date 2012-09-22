@@ -15,12 +15,11 @@ MAX_ENEMY = 4
 
 all_enemies = []
 rooms = []
+buildings = []
 empty_tiles = []
 current_rooms = 0
-
-rlscreen = pygcurse.PygcurseWindow(gui.WIN_WIDTH, gui.WIN_HEIGHT, 'Xtricate Presents: Outlast')
-rlscreen.autoupdate = False
-rlscreen.autoblit = False
+current_buildings = 0
+area = 'city'
 
 
 class Object: #A visible character on the window
@@ -54,7 +53,7 @@ class Object: #A visible character on the window
         tmpx = self.x + dx
         tmpy = self.y + dy
         for Object in objects:
-            if Object.x == tmpx and Object.y == tmpy:
+            if Object.x == tmpx and Object.y == tmpy and Object.cognitive.status == 'alive':
                 target = Object
                 break
         if target is not None:
@@ -134,6 +133,28 @@ def make_room(room):
             mp[x][y].block_sight = False
             empty_tiles.append((x, y))
 
+def make_building(building):
+    global mp, empty_tiles
+    walltiles = []
+    for x in range(building.x1, building.x2 + 1):
+        for y in range(building.y1, building.y2 + 1):
+            if x == building.x1 or x == building.x2:
+                    if y >= building.y1 and y <= building.y2:
+                        mp[x][y].blocked = True
+                        mp[x][y].block_sight = True
+                        walltiles.append((x,y)) 
+    for y in range(building.y1, building.y2 + 1):                          
+        for x in range(building.x1, building.x2 + 1):
+            if y == building.y1 or y == building.y2:
+                    if x >= building.x1 and x <= building.x2:
+                        mp[x][y].blocked = True
+                        mp[x][y].block_sight = True
+                        walltiles.append((x,y))
+    door = (walltiles[(random.randint(1, len(walltiles)) - 1)]) #return door as object type mp tile
+    mp[door[0]][door[1]].blocked = False   
+    mp[door[0]][door[1]].block_sight = False   
+            
+
 def make_map():
     global mp, current_rooms, rooms
     mp = [[Tile(True)
@@ -169,8 +190,44 @@ def make_map():
                     ver_hall(prev_y, new_y, prev_x)
                     hor_hall(prev_x, new_x, new_y)
 
-            rooms.append(new_room)
+            rooms.append(new_rooms)
             current_rooms += 1
+    return mp
+
+def make_city():
+    global mp, current_buildings, buildings
+    mp = [[Tile(False)
+    for y in range (gui.MAPHEIGHT)]
+    for x in range (gui.MAPWIDTH)]
+    for r in range (MAX_ROOMS):
+        w = random.randint(MIN_H_W, MAX_H_W)
+        h = random.randint(MIN_H_W, MAX_H_W)
+        x = random.randint(1, gui.MAPWIDTH - w - 2)
+        y = random.randint(1, gui.MAPHEIGHT - h - 2)
+
+    
+        new_building = Rectangle(x, y, w, h)
+
+        failedbuildings = 0
+        failed = False
+        for other_building in buildings:
+            if new_building.intersect(other_building):
+                failed = True
+                failedbuildings += 1
+                break
+        if not failed:
+            make_building(new_building)
+
+            buildings.append(new_building)
+            current_buildings += 1
+    # for x in range (gui.MAPWIDTH):
+    #     for y in range (gui.MAPHEIGHT):
+    #         if y == 0 or y == gui.MAPHEIGHT - 1:
+    #             mp[x][y].blocked = True
+    #             mp[x][y].block_sight = True
+    #         elif x == 0 or x == gui.MAPWIDTH - 1:
+    #             mp[x][y].blocked = True
+    #             mp[x][y].block_sight = True
     return mp
 
 def place_objects(room):
@@ -212,10 +269,16 @@ def roll(opts): #### roll() requires a dict with a key identifier, and the value
             quit()
 
 def rand_player_pos():
-     mx = len(empty_tiles)
-     start_pos = empty_tiles[random.randint(0,mx)]
-     player.x = start_pos[0]  
-     player.y = start_pos[1]  
+    global empty_tiles
+    for y in range(gui.MAPHEIGHT):
+        for x in range(gui.MAPWIDTH):
+            if not is_blocked(x, y):
+                empty_tiles.append((x, y))
+
+    mx = len(empty_tiles)
+    start_pos = empty_tiles[random.randint(0,mx)]
+    player.x = start_pos[0]  
+    player.y = start_pos[1]  
 
 def render_all():
     global mp, dirtytiles, fov_mp, MSGX, HBAR_WID
@@ -227,18 +290,18 @@ def render_all():
                 mp[x][y].explored = True
                 wall = mp[x][y].block_sight
                 if wall:
-                    rlscreen.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
+                    gui.win.putchars('#', x, y, fgcolor=(90,40,0,255)) #BROWN
                 else: 
-                    rlscreen.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
+                    gui.win.putchars('.', x, y, fgcolor=(255,255,255,255)) #WHITE
             elif mp[x][y].explored:   
                 wall = mp[x][y].block_sight
                 if wall:
-                    rlscreen.putchars('#', x, y, fgcolor=(70,70,70,255))
+                   gui.win.putchars('#', x, y, fgcolor=(70,70,70,255))
                 else: 
-                    rlscreen.putchars('.', x, y, fgcolor=(70,70,70,255))
+                    gui.win.putchars('.', x, y, fgcolor=(70,70,70,255))
     for Object in objects:
         if fov_mp[Object.x][Object.y] == 1:
-            rlscreen.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.
+            gui.win.putchars(Object.char, x=Object.x, y=Object.y, fgcolor=Object.
                 color)
     
     if player.cognitive.hp > (7 * player.cognitive.con):
@@ -247,30 +310,31 @@ def render_all():
         healthcolor = (255,255,0,255)
     else:
         healthcolor = (255,0,0,255)
-    healthbar = pygcurse.PygcurseTextbox(gui.rlgui, region = (0, gui.MAPHEIGHT, gui.HBARWID, 1), bgcolor=None, fgcolor=healthcolor, border=None, text="Health: " + str(player.cognitive.hp), wrap=False)
-    gui.msg_display()
+    healthbar = pygcurse.PygcurseTextbox(gui.win, region = (0, gui.MAPHEIGHT, gui.HBARWID, 1), bgcolor=None, fgcolor=healthcolor, border=None, text="Health: " + str(player.cognitive.hp), wrap=False)
     healthbar.update()
-    gui.rlgui.update()
-    gui.rlgui.blittowindow()
-    rlscreen.putchars(player.char, player.x, player.y, player.color)
-    rlscreen.update()
-    rlscreen.blittowindow()
-    gui.rlgui.putchars('     ', 8, gui.MAPHEIGHT, fgcolor = (0,0,0,255))
-    rlscreen.setscreencolors(pygame.Color(215,215,215), None, False)
-    gui.rlgui.fill(region=(gui.MSGX, gui.MAPHEIGHT, gui.MSG_MAX_WID, gui.MSG_HEIGHT))
+    gui.win.putchars(player.char, player.x, player.y, player.color)
+    gui.msg_update()
+    gui.win.update()
+    gui.win.blittowindow()
+    gui.win.putchars('     ', 8, gui.MAPHEIGHT, fgcolor = (0,0,0,255))
+    gui.win.setscreencolors(pygame.Color(215,215,215), None, False)
+    gui.win.fill(region=(gui.MSGX, gui.MAPHEIGHT, gui.MSG_MAX_WID, gui.MSG_HEIGHT))
 
 def init():
     global mp, player, objects, player_cognitive
 
     player = Object(0, 0, '@', 'player', pygame.Color(255,255,255), cognitive = player_cognitive)
     objects = [player]
-    mp = make_map()
+    if area == 'dungeon':
+        mp = make_map()
+    elif area == 'city':
+        mp = make_city()
     rand_player_pos()
     return mp
 
 ####  TEMP VARS #####
 
-con = 5
+con = 10
 agi = 5
 pwr = 4
 stg = 4
