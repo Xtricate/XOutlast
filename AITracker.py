@@ -42,10 +42,7 @@ class Cognitive:
             self.owner.send_to_back()
             self.owner.char = '%'
             self.owner.color = pygame.Color(100,0,0)
-            print self.owner.name
-            print 'blocks before?' + str(self.owner.blocks)
             self.owner.blocks = False
-            print 'blocks?' +  str(self.owner.blocks)
             self.status = 'dead'
             if self.owner.name == 'player':
                 game_state = 'dead'

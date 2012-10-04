@@ -39,7 +39,7 @@ def msg_update():
         y += 1
     cur_msgs = []
 
-def menu(headers, options, height):
+def menu(headers, options, height, width=20):
     length = len(options)
     headerl = len(headers)
     if length + height + headerl > WIN_HEIGHT:
@@ -47,11 +47,11 @@ def menu(headers, options, height):
     y = height + headerl + 2
     letter_index = ord('a')
     for header in headers:
-        win.putchars(header.text, 20, height, fgcolor=header.color)
+        win.putchars(header.text, width, height, fgcolor=header.color)
         height += 1
     for option_text in options:
-        text = '(' + chr(letter_index) + ')' + option_text
-        win.putchars(text, 20, y)
+        text = '(' + chr(letter_index) + ') ' + option_text
+        win.putchars(text, width, y)
         y += 1
         letter_index += 1
     return chr(letter_index)

@@ -13,10 +13,14 @@ MIN_H_W = 6
 MAX_ROOMS = 30
 MAX_ENEMY = 4
 
+level = 0
 all_enemies = []
+down_stairs = []
+up_stairs = []
 rooms = []
 buildings = []
 empty_tiles = []
+floor_tiles = []
 current_rooms = 0
 current_buildings = 0
 area = 'city'
@@ -24,6 +28,7 @@ area = 'city'
 
 class Object: #A visible character on the window
     def __init__(self, x, y, char, name, color, blocks=False, cognitive=False):
+        global floor_tiles
         self.name = name
         self.blocks = blocks
         self.x = x
@@ -33,6 +38,8 @@ class Object: #A visible character on the window
         self.cognitive = cognitive
         if self.cognitive:
             self.cognitive.owner = self
+
+
 
     def move(self, dx, dy):
         if not is_blocked(self.x + dx, self.y + dy):
@@ -52,12 +59,24 @@ class Object: #A visible character on the window
         target = None
         tmpx = self.x + dx
         tmpy = self.y + dy
-        for Object in objects:
+        for Object in all_enemies:
             if Object.x == tmpx and Object.y == tmpy and Object.cognitive.status == 'alive':
                 target = Object
                 break
         if target is not None:
             self.cognitive.mel_attack(target)
+        if tmpx == 0 or tmpx == gui.MAPWIDTH - 1 or tmpy == 0 or tmpy == gui.MAPHEIGHT - 1:
+            if tmpx == 0:
+                self.x = gui.MAPWIDTH - 2
+            elif tmpx == gui.MAPWIDTH - 1:
+                self.x = 1
+            elif tmpy == 0:
+                self.y = gui.MAPHEIGHT - 2
+            elif tmpy == gui.MAPHEIGHT - 1:
+                self.y = 1
+            mp = make_city()
+            gui.win.setscreencolors(None, None, True)
+            return
         else:
             self.move(dx, dy)
 
@@ -69,8 +88,9 @@ class Object: #A visible character on the window
     def send_to_back(self):
         #make this object be drawn first, so all others appear above it if they're in the same tile.
         global objects
-        objects.remove(self)
-        objects.insert(0, self)
+        if self in objects:
+            objects.remove(self)
+            objects.insert(0, self)
 
 class Tile:
     def __init__(self, blocked, block_sight=None):
@@ -85,6 +105,8 @@ class Rectangle:
         self.y1 = y
         self.x2 = x + w
         self.y2 = y + h
+
+
     
     def center(self):
         center_x = (self.x1 + self.x2) / 2
@@ -93,6 +115,7 @@ class Rectangle:
 
     def intersect(self, other):
         return (self.x1 - 1) <= other.x2 and (self.x2 + 1) >= other.x1 and (self.y1 - 1) <= other.y2 and (self.y2 + 1) >= other.y1
+
 
 def is_blocked(x,y):
     if mp[x][y].blocked:
@@ -109,7 +132,7 @@ def ai_go():
     ait.fov_mp = fov_mp
     ait.objects = objects
     ait.player = player
-    for Object in objects:
+    for Object in all_enemies:
         if Object.cognitive.ai != None and Object.cognitive.status == 'alive':
             Object.cognitive.ai.take_turn()
 
@@ -126,16 +149,20 @@ def ver_hall(y1, y2, x):
         mp[x][y].block_sight = False        
 
 def make_room(room):
-    global mp, empty_tiles
+    global mp, floor_tiles   
     for x in range(room.x1, room.x2 + 1):
         for y in range(room.y1, room.y2 + 1):
             mp[x][y].blocked = False
             mp[x][y].block_sight = False
-            empty_tiles.append((x, y))
+            floor_tiles.append(((x),(y))) 
 
 def make_building(building):
-    global mp, empty_tiles
+    global mp, floor_tiles
     walltiles = []
+    
+    for x in range(building.x1 + 1, building.x2):
+        for y in range(building.y1 + 1, building.y2):
+            floor_tiles.append(((x),(y)))
     for x in range(building.x1, building.x2 + 1):
         for y in range(building.y1, building.y2 + 1):
             if x == building.x1 or x == building.x2:
@@ -156,7 +183,14 @@ def make_building(building):
             
 
 def make_map():
-    global mp, current_rooms, rooms
+    global mp, current_rooms, rooms, level, mapDownStairs, mapUpStairs
+    up_stairs = []
+    down_stairs = []
+    if level < 5:
+        mapDownStairs = True
+    else:
+        mapDownStairs = False
+    mapUpStairs = True
     mp = [[Tile(True)
     for y in range(gui.MAPHEIGHT)]
     for x in range(gui.MAPWIDTH)]
@@ -190,20 +224,30 @@ def make_map():
                     ver_hall(prev_y, new_y, prev_x)
                     hor_hall(prev_x, new_x, new_y)
 
-            rooms.append(new_rooms)
+            rooms.append(new_room)
             current_rooms += 1
+    place_stairs()
     return mp
 
 def make_city():
-    global mp, current_buildings, buildings
+    global mp, current_buildings, buildings, mapDownStairs, mapUpStairs,floor_tiles, all_enemies, up_stairs, down_stairs, objects
+    objects = []
+    all_enemies = []
+    up_stairs = []
+    down_stairs = []
+    current_buildings = 0
+    buildings = []
+    floor_tiles = []
+    mapUpStairs = False
+    mapDownStairs = True
     mp = [[Tile(False)
     for y in range (gui.MAPHEIGHT)]
     for x in range (gui.MAPWIDTH)]
     for r in range (MAX_ROOMS):
         w = random.randint(MIN_H_W, MAX_H_W)
         h = random.randint(MIN_H_W, MAX_H_W)
-        x = random.randint(1, gui.MAPWIDTH - w - 2)
-        y = random.randint(1, gui.MAPHEIGHT - h - 2)
+        x = random.randint(2, gui.MAPWIDTH - w - 3)
+        y = random.randint(2, gui.MAPHEIGHT - h - 3)
 
     
         new_building = Rectangle(x, y, w, h)
@@ -217,17 +261,10 @@ def make_city():
                 break
         if not failed:
             make_building(new_building)
-
             buildings.append(new_building)
+            place_objects(new_building)
             current_buildings += 1
-    # for x in range (gui.MAPWIDTH):
-    #     for y in range (gui.MAPHEIGHT):
-    #         if y == 0 or y == gui.MAPHEIGHT - 1:
-    #             mp[x][y].blocked = True
-    #             mp[x][y].block_sight = True
-    #         elif x == 0 or x == gui.MAPWIDTH - 1:
-    #             mp[x][y].blocked = True
-    #             mp[x][y].block_sight = True
+    place_stairs()
     return mp
 
 def place_objects(room):
@@ -241,11 +278,11 @@ def place_objects(room):
             y = random.randint(room.y1, room.y2)
             if mp[x][y].blocked != True:
                 acceptable_tile = True
-        enemy_list = {'zombie':5, 'brute':2}
+        enemy_list = {'zombie':5, 'brute':2, 'zombling':4}
         enemy = roll(enemy_list)
         if enemy == 'zombie':
             z_cog = ait.Cognitive(2, 2, 1, 2, 1, ai=ait.Enemy())
-            new_enemy = Object(x, y, 'z', 'zombie', pygame.Color(15,170,15), blocks=True, cognitive=z_cog)
+            new_enemy = Object(x, y, 'Z', 'zombie', pygame.Color(15,170,15), blocks=True, cognitive=z_cog)
             objects.append(new_enemy)
             all_enemies.append(new_enemy)
         elif enemy == 'brute':
@@ -253,6 +290,27 @@ def place_objects(room):
             new_enemy = Object(x, y, 'b', 'brute', pygame.Color(70,15,15), blocks=True, cognitive=b_cog)
             objects.append(new_enemy)
             all_enemies.append(new_enemy)
+        elif enemy == 'zombling':
+            zg_cog = ait.Cognitive(1, 4, 1, 1, 1, ai=ait.Enemy())
+            new_enemy = Object(x, y, 'g', 'zombling', pygame.Color(150,15,15), blocks=True, cognitive=zg_cog)
+            objects.append(new_enemy)
+            all_enemies.append(new_enemy)
+
+def place_stairs():
+    global mp, floor_tiles, mapDownStairs, mapUpStairs, up_stairs, down_stairs
+    totstairs = random.randint(1, int(((gui.MAPHEIGHT * gui.MAPWIDTH) // 1200)))
+    if mapDownStairs == True:
+        for n in range(totstairs):
+            ftile = floor_tiles[random.randint(0, len(floor_tiles) - 1)]
+            stairs = Object(ftile[0], ftile[1], '>', 'stairs down', pygame.Color(120, 50, 10))
+            down_stairs.append(stairs)
+            objects.append(stairs)
+    if mapUpStairs == True:
+        for n in range(totstairs):
+            ftile = floor_tiles[random.randint(0, len(floor_tiles) - 1)]
+            stairs = Object(ftile[0], ftile[1], '<', 'stairs up', pygame.Color(120, 50, 10))
+            up_stairs.append(stairs)
+            objects.append(stairs)
 
 def roll(opts): #### roll() requires a dict with a key identifier, and the value assoc. as the number of chances the key recieves
     cur_key = 0
@@ -270,10 +328,6 @@ def roll(opts): #### roll() requires a dict with a key identifier, and the value
 
 def rand_player_pos():
     global empty_tiles
-    for y in range(gui.MAPHEIGHT):
-        for x in range(gui.MAPWIDTH):
-            if not is_blocked(x, y):
-                empty_tiles.append((x, y))
 
     mx = len(empty_tiles)
     start_pos = empty_tiles[random.randint(0,mx)]
@@ -312,6 +366,7 @@ def render_all():
         healthcolor = (255,0,0,255)
     healthbar = pygcurse.PygcurseTextbox(gui.win, region = (0, gui.MAPHEIGHT, gui.HBARWID, 1), bgcolor=None, fgcolor=healthcolor, border=None, text="Health: " + str(player.cognitive.hp), wrap=False)
     healthbar.update()
+    gui.win.putchars('Level ' + str(level) + ' of the ' + area, 0, gui.MAPHEIGHT + 1, fgcolor = pygame.Color(125, 170, 125))
     gui.win.putchars(player.char, player.x, player.y, player.color)
     gui.msg_update()
     gui.win.update()
@@ -320,25 +375,44 @@ def render_all():
     gui.win.setscreencolors(pygame.Color(215,215,215), None, False)
     gui.win.fill(region=(gui.MSGX, gui.MAPHEIGHT, gui.MSG_MAX_WID, gui.MSG_HEIGHT))
 
+def create_mp():
+    global mp, current_rooms, rooms, empty_tiles, all_enemies, objects, floor_tiles, empty_tiles, area, current_buildings
+    objects = [player]
+    current_rooms = 0
+    current_buildings = 0
+    rooms = []
+    floor_tiles = []
+    empty_tiles = []
+    all_enemies = []
+    mp = []
+    gui.win.setscreencolors(None, None, True)
+    if area == 'dungeon':
+        mp = make_map()
+    elif area == 'city':
+        mp = make_city()
+    for x in range(gui.MAPWIDTH):
+        for y in range(gui.MAPHEIGHT):
+            if not is_blocked(x, y):
+                empty_tiles.append((x, y))
+    rand_player_pos()
+    render_all()
+    return mp
+
 def init():
     global mp, player, objects, player_cognitive
 
     player = Object(0, 0, '@', 'player', pygame.Color(255,255,255), cognitive = player_cognitive)
     objects = [player]
-    if area == 'dungeon':
-        mp = make_map()
-    elif area == 'city':
-        mp = make_city()
-    rand_player_pos()
+    mp = create_mp()
     return mp
 
 ####  TEMP VARS #####
 
-con = 10
-agi = 5
-pwr = 4
-stg = 4
-itl = 5
+con = 50
+agi = 50
+pwr = 50
+stg = 50
+itl = 50
 player_cognitive = Cognitive(con, agi, pwr, stg, itl)
 
 #### /TEMP VARS #####
